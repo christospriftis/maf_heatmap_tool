@@ -1,0 +1,4 @@
+original,new
+General: Intake manifold pressure (G71),MAP_mbar
+General: Engine speed (G28),RPM
+Emission reduction (secondary air injection: Mass air flow sensor (G70),MAF_gps
