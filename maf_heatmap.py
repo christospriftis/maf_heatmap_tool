@@ -5,26 +5,32 @@ import seaborn as sns
 
 st.title("MAF and Sample Count Heatmaps by MAP and RPM")
 
-# File uploader
-uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+# Step 1: Upload main CSV log file
+uploaded_file = st.file_uploader("Step 1: Upload your Log File (CSV)", type=["csv"])
 
-if uploaded_file is not None:
-    # Load data
+# Step 2: Upload mapping file
+mapping_file = st.file_uploader("Step 2: Upload Column Mapping File (CSV)", type=["csv"])
+
+if uploaded_file is not None and mapping_file is not None:
+    # Load the main data and mapping
     df = pd.read_csv(uploaded_file)
-    
-    # Rename columns (adjust if your CSV has different headers)
-    df.rename(columns={
-        'General: Intake manifold pressure (G71)': 'MAP_mbar',
-        'General: Intake air temperature (G42)': 'IAT_C',
-        'General: Engine speed (G28)': 'RPM',
-        'Emission reduction (secondary air injection: Mass air flow sensor (G70)': 'MAF_gps',
-        'Lambda control (lambda sensor voltages): Lambda control bank 1 (specified)': 'AFR_specified',
-        'General: Injection timing': 'Injector_PW_ms',
-        'Lambda control: Lambda control bank 1 sensor 1': 'STFT_percent'
-    }, inplace=True)
+    mapping_df = pd.read_csv(mapping_file)
 
-    # Drop missing or zero values
-    df = df.dropna(subset=['MAP_mbar', 'IAT_C', 'RPM', 'MAF_gps', 'AFR_specified', 'Injector_PW_ms'])
+    # Create dictionary from mapping file: {original: new}
+    mapping_dict = dict(zip(mapping_df['original'], mapping_df['new']))
+
+    # Rename columns in the data using the mapping
+    df.rename(columns=mapping_dict, inplace=True)
+
+    # Check for required standardized columns
+    required_columns = ['MAP_mbar', 'RPM', 'MAF_gps']
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        st.error(f"Missing required columns after mapping: {', '.join(missing_cols)}")
+        st.stop()
+
+    # Drop missing or invalid values
+    df = df.dropna(subset=['MAP_mbar', 'RPM', 'MAF_gps'])
     df = df[(df['MAP_mbar'] > 0) & (df['RPM'] > 0) & (df['MAF_gps'] > 0)]
 
     # Binning
@@ -36,7 +42,7 @@ if uploaded_file is not None:
     sample_count_map = df.pivot_table(index='MAP_bin', columns='RPM_bin', values='MAF_gps', aggfunc='count')
     sample_count_map_int = sample_count_map.fillna(0).astype(int)
 
-    # Plotting side-by-side heatmaps with matplotlib and seaborn
+    # Plotting
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7))
 
     sns.heatmap(maf_map, cmap='viridis', annot=True, fmt=".1f", ax=ax1, cbar_kws={'label': 'Avg MAF (g/s)'})
@@ -55,4 +61,4 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
 else:
-    st.info("Please upload a CSV file to see the heatmaps.")
+    st.info("Please upload both the log file and the mapping file to continue.")
